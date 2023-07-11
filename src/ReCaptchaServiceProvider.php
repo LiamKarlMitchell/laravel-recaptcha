@@ -14,6 +14,7 @@ namespace Biscolab\ReCaptcha;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Carbon;
 
 /**
  * Class ReCaptchaServiceProvider
@@ -52,10 +53,46 @@ class ReCaptchaServiceProvider extends ServiceProvider
         if (!config('recaptcha.empty_message')) {
             $message = trans(config('recaptcha.error_message_key'));
         }
-        Validator::extendImplicit(recaptchaRuleName(), function ($attribute, $value) {
 
-            return app('recaptcha')->validate($value);
-        }, $message);
+        switch (config('recaptcha.version')) {
+            case 'v3':
+                Validator::extendImplicit(recaptchaRuleName(), function ($attribute, $value, $parameters) {
+                    $threshold = floatval($parameters[0] ?? 0.5);
+                    $action = $parameters[1] ?? '';
+
+                    $response = app('recaptcha')->validate($value);
+                    // info("recaptcha response is: ".json_encode($response));
+                    if (isset($response['skip_by_ip']) && filled($response['skip_by_ip'])) {
+                        return true;
+                    }
+
+                    // Verify action if present.
+                    if (filled($action) && isset($response['action']) && $response['action'] !== $action) {
+                        // info("recaptcha action verification failed");
+                        return false;
+                    }
+
+                    // Verify that challenge_ts is within the last 2 minutes if present.
+                    if (isset($response['challenge_ts']) && filled($response['challenge_ts'])) {
+                        $challengeTimestamp = Carbon::parse($response['challenge_ts']);
+                        $currentTimestamp = Carbon::now();
+                        if ($challengeTimestamp->diffInMinutes($currentTimestamp) > 2) {
+                            // info("recaptcha challenge_ts verification failed");
+                            return false;
+                        }
+                    }
+
+                    return (isset($response['success']) && isset($response['score']) && $response['success']
+                        && $response['score'] >= $threshold);
+                }, $message);
+                break;
+            case 'v2':
+            case 'invisible':
+                Validator::extendImplicit(recaptchaRuleName(), function ($attribute, $value) {
+                    return app('recaptcha')->validate($value);
+                }, $message);
+                break;
+        }
     }
 
     /**

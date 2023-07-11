@@ -63,6 +63,8 @@ class ReCaptchaBuilderV3 extends ReCaptchaBuilder
      * Write script HTML tag in you HTML code
      * Insert before </head> tag
      *
+     * I suspect that this is used to inform reCAPTCHA about the page load.
+     *
      * @param array|null $configuration
      *
      * @return string
@@ -118,4 +120,62 @@ class ReCaptchaBuilderV3 extends ReCaptchaBuilder
 
         return $html;
     }
+
+    /**
+     * Writes a HTML script tag that exposes a ReCaptchaV3 object for resolving the reCAPTCHA token.
+     * Insert this before the closing </head> tag, following the htmlScriptTagJsApi call, as it does not load the reCAPTCHA script.
+     *
+     * The ReCaptchaV3 object in JavaScript has a method called execute that returns a promise resolving with a reCAPTCHA token.
+     *   - action: string, defaults to 'homepage'.
+     *     You may set this to a specific action, such as "contact_form_submit", based on the user's action.
+     *
+     * @return string The generated script HTML tag.
+     */
+    public function htmlScriptTagJsObjectV3(): string
+    {
+        $html = '';
+        if ($this->skip_by_ip) {
+            $html .= "<script>
+                  ReCaptchaV3 = {
+                      execute: async (action = 'homepage') => return 'skip_by_ip'
+                  };
+		     </script>";
+            return $html;
+        }
+
+        $html .= "<script>
+                  ReCaptchaV3 = {
+                      execute: async (action = 'homepage') => {
+                          return new Promise((resolve, reject) => {
+                              grecaptcha.ready(function() {
+                                  grecaptcha.execute('{$this->api_site_key}', {action: action})
+                                  .then(token => resolve(token))
+                                  .catch(err => reject(err));
+                              })
+                          });
+                      }
+                    };
+		     </script>";
+
+        return $html;
+    }
+
+    /***
+     * The same as htmlScriptTagJsObjectV3 but it loads the reCAPTCHA script if the user is not skipped by IP.
+     * Can be used if you only want to include on specific pages but not send on page load.
+     *
+     * @return string
+     */
+    public function htmlScriptTagJsObjectV3WithDependency(): string
+    {
+        $html = '';
+        if (!$this->skip_by_ip) {
+            $html = "<script src=\"".$this->api_js_url."?render={$this->api_site_key}\"></script>";
+            return $html;
+        }
+        $html .= $this->htmlScriptTagJsObjectV3();
+
+        return $html;
+    }
+
 }

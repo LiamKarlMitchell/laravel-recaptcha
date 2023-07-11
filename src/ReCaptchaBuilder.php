@@ -294,6 +294,32 @@ class ReCaptchaBuilder
     }
 
     /**
+     * Writes a HTML script tag that exposes a ReCaptchaV3 object for resolving the reCAPTCHA token.
+     * Insert this before the closing </head> tag, following the htmlScriptTagJsApi call, as it does not load the reCAPTCHA script.
+     *
+     * The ReCaptchaV3 object in JavaScript has a method called execute that returns a promise resolving with a reCAPTCHA token.
+     *   - action: string, defaults to 'homepage'.
+     *     You may set this to a specific action, such as "contact_form_submit", based on the user's action.
+     *
+     * @return string The generated script HTML tag.
+     */
+    public function htmlScriptTagJsObjectV3(): string
+    {
+        return '<!-- htmlScriptTagJsObjectV3 is not implemented for other versions. -->';
+    }
+
+    /***
+     * The same as htmlScriptTagJsObjectV3 but it loads the reCAPTCHA script if the user is not skipped by IP.
+     * Can be used if you only want to include on specific pages but not send on page load.
+     *
+     * @return string
+     */
+    public function htmlScriptTagJsObjectV3WithDependency(): string
+    {
+        return '<!-- htmlScriptTagJsObjectV3WithDependency is not implemented for other versions. -->';
+    }
+
+    /**
      * Call out to reCAPTCHA and process the response
      *
      * @param string $response
@@ -302,7 +328,7 @@ class ReCaptchaBuilder
      */
     public function validate($response)
     {
-
+        // info("Recaptcha Validation called: ".$response);
         if ($this->skip_by_ip) {
             if ($this->returnArray()) {
                 // Add 'skip_by_ip' field to response
@@ -349,6 +375,7 @@ class ReCaptchaBuilder
             return false;
         }
         $response = json_decode(trim($curl_response), true);
+        //info('Response from recaptcha'.json_encode($response));
 
         if ($this->returnArray()) {
             return $response;
